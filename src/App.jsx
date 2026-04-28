@@ -1632,30 +1632,55 @@ export default function App() {
     return selectedVoice;
   };
 
-  const speakWithBrowserTTS = async (text) => {
-    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      throw new Error("Trình duyệt không hỗ trợ SpeechSynthesis.");
+  const speakWithGoogleTTS = async (text) => {
+    const apiKey = import.meta.env.VITE_GOOGLE_TTS_API_KEY;
+    if (!apiKey) {
+      throw new Error("Google TTS API key chưa được cấu hình.");
     }
 
-    window.speechSynthesis.cancel();
+    const url = "https://texttospeech.googleapis.com/v1/text:synthesize";
+    const payload = {
+      input: { text },
+      voice: {
+        languageCode: "vi-VN",
+        name: "vi-VN-Neural2-A" // Giọng nữ Việt chất lượng cao
+      },
+      audioConfig: {
+        audioEncoding: "MP3",
+        pitch: 0,
+        speakingRate: 1.0
+      }
+    };
 
-    const stableVoice = await getStableBrowserVoice();
+    const response = await fetch(`${url}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(`Google TTS error: ${error.error?.message || "Unknown"}`);
+    }
+
+    const data = await response.json();
+    
+    // Phát âm thanh
     return new Promise((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = stableVoice?.lang || "vi-VN";
-      utterance.rate = 0.95;
-      utterance.pitch = 1;
-      if (stableVoice) utterance.voice = stableVoice;
-
-      utterance.onend = resolve;
-      utterance.onerror = resolve;
-
-      window.speechSynthesis.speak(utterance);
+      const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
+      audio.onended = resolve;
+      audio.onerror = () => {
+        console.error("Audio playback error");
+        resolve();
+      };
+      audio.play().catch((err) => {
+        console.error("Play error:", err);
+        resolve();
+      });
     });
   };
 
-  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation
+  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng Google TTS
   useEffect(() => {
     if (!isAIVoiceEnabled || frames.length === 0 || !frames[currentStep])
       return;
@@ -1669,7 +1694,7 @@ export default function App() {
       try {
         if (!isCancelled) {
           setSpeechStatus("SPEAKING");
-          await speakWithBrowserTTS(frame.explanation);
+          await speakWithGoogleTTS(frame.explanation);
         }
 
         if (!isCancelled) {
@@ -1681,7 +1706,7 @@ export default function App() {
           setIsPlaying(false);
           setSpeechStatus("IDLE");
           setSpeechError(
-            "Không đọc được bằng giọng máy ổn định của trình duyệt. Hãy thử mở app bằng Chrome hoặc Edge.",
+            `Lỗi giọng nói: ${e.message}. Hãy kiểm tra Google TTS API key trong .env.local.`,
           );
         }
       }
@@ -1691,9 +1716,6 @@ export default function App() {
 
     return () => {
       isCancelled = true;
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
     };
   }, [currentStep, isAIVoiceEnabled, frames]);
 
