@@ -1632,15 +1632,21 @@ export default function App() {
     return selectedVoice;
   };
 
-  const speakWithGoogleTranslateTTS = async (text) => {
-    // Dùng Google Translate TTS API (miễn phí, tiếng Việt chất lượng tốt)
-    // Endpoint không cần API key
-    const url = "https://translate.google.com/translate_tts";
+  const speakWithVoiceRSS = async (text) => {
+    const apiKey = import.meta.env.VITE_VOICE_RSS_API_KEY;
+    if (!apiKey) {
+      throw new Error("VoiceRSS API key chưa được cấu hình.");
+    }
+
+    // VoiceRSS TTS API - Tiếng Việt chất lượng cao
+    const url = "https://api.voicerss.org/";
     
     const params = new URLSearchParams({
-      client: "gtx",
-      tl: "vi", // Tiếng Việt
-      q: text
+      key: apiKey,
+      src: text,
+      hl: "vi-vn", // Tiếng Việt
+      c: "MP3", // Format MP3
+      f: "44khz_16bit_stereo" // Chất lượng cao
     });
 
     return new Promise((resolve) => {
@@ -1661,7 +1667,7 @@ export default function App() {
     });
   };
 
-  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng Google Translate TTS
+  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng VoiceRSS TTS
   useEffect(() => {
     if (!isAIVoiceEnabled || frames.length === 0 || !frames[currentStep])
       return;
@@ -1675,7 +1681,7 @@ export default function App() {
       try {
         if (!isCancelled) {
           setSpeechStatus("SPEAKING");
-          await speakWithGoogleTranslateTTS(frame.explanation);
+          await speakWithVoiceRSS(frame.explanation);
         }
 
         if (!isCancelled) {
@@ -1687,7 +1693,7 @@ export default function App() {
           setIsPlaying(false);
           setSpeechStatus("IDLE");
           setSpeechError(
-            `Lỗi giọng nói: ${e.message}. Kiểm tra kết nối Internet.`,
+            `Lỗi giọng nói: ${e.message}. Hãy kiểm tra VoiceRSS API key trong .env.local.`,
           );
         }
       }
