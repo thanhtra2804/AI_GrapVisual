@@ -1632,28 +1632,36 @@ export default function App() {
     return selectedVoice;
   };
 
-  const speakWithWebSpeechAPI = async (text) => {
-    // Dùng Web Speech API (miễn phí, tích hợp sẵn)
+  const speakWithGoogleTranslateTTS = async (text) => {
+    // Dùng Google Translate TTS API (miễn phí, tiếng Việt chất lượng tốt)
+    // Endpoint không cần API key
+    const url = "https://translate.google.com/translate_tts";
+    
+    const params = new URLSearchParams({
+      client: "gtx",
+      tl: "vi", // Tiếng Việt
+      q: text
+    });
+
     return new Promise((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "vi-VN"; // Tiếng Việt
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-
-      utterance.onend = () => {
+      const audio = new Audio(`${url}?${params.toString()}`);
+      
+      audio.onended = () => {
         resolve();
       };
-      utterance.onerror = (event) => {
-        console.error("Speech synthesis error:", event);
+      audio.onerror = (err) => {
+        console.error("Audio playback error:", err);
         resolve();
       };
-
-      window.speechSynthesis.speak(utterance);
+      
+      audio.play().catch((err) => {
+        console.error("Play error:", err);
+        resolve();
+      });
     });
   };
 
-  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng Web Speech API
+  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng Google Translate TTS
   useEffect(() => {
     if (!isAIVoiceEnabled || frames.length === 0 || !frames[currentStep])
       return;
@@ -1667,7 +1675,7 @@ export default function App() {
       try {
         if (!isCancelled) {
           setSpeechStatus("SPEAKING");
-          await speakWithWebSpeechAPI(frame.explanation);
+          await speakWithGoogleTranslateTTS(frame.explanation);
         }
 
         if (!isCancelled) {
@@ -1679,7 +1687,7 @@ export default function App() {
           setIsPlaying(false);
           setSpeechStatus("IDLE");
           setSpeechError(
-            `Lỗi giọng nói: ${e.message}. Hãy kiểm tra trình duyệt hỗ trợ Web Speech API.`,
+            `Lỗi giọng nói: ${e.message}. Kiểm tra kết nối Internet.`,
           );
         }
       }
