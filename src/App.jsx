@@ -1632,55 +1632,63 @@ export default function App() {
     return selectedVoice;
   };
 
-  const speakWithGoogleTTS = async (text) => {
-    const apiKey = import.meta.env.VITE_GOOGLE_TTS_API_KEY;
+  const speakWithElevenLabsTTS = async (text) => {
+    const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
     if (!apiKey) {
-      throw new Error("Google TTS API key chưa được cấu hình.");
+      throw new Error("ElevenLabs API key chưa được cấu hình.");
     }
 
-    const url = "https://texttospeech.googleapis.com/v1/text:synthesize";
-    const payload = {
-      input: { text },
-      voice: {
-        languageCode: "vi-VN",
-        name: "vi-VN-Neural2-A" // Giọng nữ Việt chất lượng cao
-      },
-      audioConfig: {
-        audioEncoding: "MP3",
-        pitch: 0,
-        speakingRate: 1.0
-      }
-    };
+    // Giọng Việt của ElevenLabs
+    const voiceId = "21m00Tcm4TlvDq8ikWAM"; // Giọng mặc định
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
-    const response = await fetch(`${url}?key=${apiKey}`, {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: "eleven_monolingual_v1",
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+        },
+      }),
     });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(`Google TTS error: ${error.error?.message || "Unknown"}`);
+      throw new Error(
+        `ElevenLabs error: ${error.detail?.message || "Unknown"}`,
+      );
     }
 
-    const data = await response.json();
-    
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+
     // Phát âm thanh
     return new Promise((resolve) => {
-      const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-      audio.onended = resolve;
+      const audio = new Audio(audioUrl);
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        resolve();
+      };
       audio.onerror = () => {
         console.error("Audio playback error");
+        URL.revokeObjectURL(audioUrl);
         resolve();
       };
       audio.play().catch((err) => {
         console.error("Play error:", err);
+        URL.revokeObjectURL(audioUrl);
         resolve();
       });
     });
   };
 
-  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng Google TTS
+  // Effect: Khi chuyển bước, nếu bật AI Giảng thì đọc Explanation bằng ElevenLabs TTS
   useEffect(() => {
     if (!isAIVoiceEnabled || frames.length === 0 || !frames[currentStep])
       return;
@@ -1694,7 +1702,7 @@ export default function App() {
       try {
         if (!isCancelled) {
           setSpeechStatus("SPEAKING");
-          await speakWithGoogleTTS(frame.explanation);
+          await speakWithElevenLabsTTS(frame.explanation);
         }
 
         if (!isCancelled) {
@@ -1706,7 +1714,7 @@ export default function App() {
           setIsPlaying(false);
           setSpeechStatus("IDLE");
           setSpeechError(
-            `Lỗi giọng nói: ${e.message}. Hãy kiểm tra Google TTS API key trong .env.local.`,
+            `Lỗi giọng nói: ${e.message}. Hãy kiểm tra ElevenLabs API key trong .env.local.`,
           );
         }
       }
