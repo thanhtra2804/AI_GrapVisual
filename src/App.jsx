@@ -1640,18 +1640,18 @@ export default function App() {
 
     // VoiceRSS TTS API - Tiếng Việt chất lượng cao
     const url = "https://api.voicerss.org/";
-    
+
     const params = new URLSearchParams({
       key: apiKey,
       src: text,
       hl: "vi-vn", // Tiếng Việt
       c: "MP3", // Format MP3
-      f: "44khz_16bit_stereo" // Chất lượng cao
+      f: "44khz_16bit_stereo", // Chất lượng cao
     });
 
     return new Promise((resolve) => {
       const audio = new Audio(`${url}?${params.toString()}`);
-      
+
       audio.onended = () => {
         resolve();
       };
@@ -1659,7 +1659,7 @@ export default function App() {
         console.error("Audio playback error:", err);
         resolve();
       };
-      
+
       audio.play().catch((err) => {
         console.error("Play error:", err);
         resolve();
